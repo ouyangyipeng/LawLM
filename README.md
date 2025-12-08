@@ -11,10 +11,11 @@ OCR 识别 → 智能分类(路由) → 知识库预修正 → 双LLM并行校�
 - OCR：`rapidocr_onnxruntime`（CPU 推理），兼容 list/结构化输出，按 y 轴聚类恢复阅读顺序。
 - 知识库：基于 `final_law_dict.txt` + RapidFuzz 模糊匹配，生成纠错提示注入 LLM。
 - LLM：DeepSeek API（OpenAI SDK 兼容），双路角色并行（Reviewer/Proofreader），Arbiter 仲裁，最多 3 轮。
-- 提示词：分阶段模板存放 `prompt/`，可审计、可复用。
+- 提示词：分阶段模板存放 `prompt/`，可审计、可复用；支持 `--prompt-profile` 切换子目录。
 - 输出：
   - 每图独立目录：`result/<stem>/`，含 `*_result.txt`（OCR 主输出）、`report.json`、`report.md`。
   - 汇总：`result_report.csv` 与 `suggestion.md`。
+- OCR 预处理：可选灰度+自适应对比度+边缘填充（默认开启，可 `--no-preprocess` 关闭）。
 - CLI：支持单文件或目录批处理，缺省遍历 `./img`。
 
 ## 目录结构
@@ -92,6 +93,17 @@ python main.py --dir /path/to/images
 python main.py --dir img --result-root out_dir
 ```
 
+### 5) 选择提示词配置
+```bash
+python main.py --prompt-profile default   # 使用 prompt/ 下默认模板
+python main.py --prompt-profile finance   # 使用 prompt/finance/ 下模板
+```
+
+### 6) 关闭 OCR 预处理
+```bash
+python main.py --no-preprocess
+```
+
 ## 输入/输出说明
 - 输入：`img/` 下的图片，支持 `.png .jpg .jpeg .bmp .tif .tiff`。
 - 单图输出：`result/<stem>/`
@@ -110,8 +122,10 @@ python main.py --dir img --result-root out_dir
 ## 参考运行记录
 - 已在 `img/1..5.jpg` 与 `img/not_complete1.png` 上验证，输出均落盘到 `result/` 对应子目录，并追加到 `result_report.csv`。
 
-## 后续可拓展方向
-- GPU 版 RapidOCR / OCR 前处理（去噪、旋转校正）。
-- RAG 增强：向量检索提供上下文支撑。
-- 自动评测：CER/WER 与法律要素抽取准确率基准。
-- 模板参数化：多语言/多条线合规提示自动切换。
+## 已完成与可拓展
+- 已增加：轻量 OCR 预处理（灰度+自适应对比度+边缘填充，可关闭）。
+- 已增加：提示词配置可切换（`--prompt-profile`），支持多条线/多语言自定义模板。
+- 待拓展：
+   - GPU 版 RapidOCR / 更深度的去噪、旋转校正。
+   - RAG：向量检索提供上下文支撑。
+   - 自动评测：CER/WER 与法律要素抽取准确率基准。

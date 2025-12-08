@@ -27,6 +27,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--file", type=Path, help="Single image file to process", dest="file")
     parser.add_argument("--dir", type=Path, help="Directory of images to process", dest="directory")
     parser.add_argument("--result-root", type=Path, default=Path("result"), help="Root directory for outputs")
+    parser.add_argument("--prompt-profile", type=str, default="default", help="Prompt profile directory under prompt/")
+    parser.add_argument("--no-preprocess", action="store_true", help="Disable OCR preprocessing")
     return parser.parse_args()
 
 
@@ -41,15 +43,15 @@ def collect_images(single_file: Path | None, directory: Path | None) -> List[Pat
     return [p for p in dir_path.iterdir() if p.suffix.lower() in SUPPORTED_SUFFIXES]
 
 
-def run_pipeline(image_dir: Path, output_csv: Path, suggestion_md: Path, result_root: Path) -> None:
+def run_pipeline(image_dir: Path, output_csv: Path, suggestion_md: Path, result_root: Path, prompt_dir: Path, enable_preprocess: bool) -> None:
     load_dotenv()
     setup_logging()
     logger = logging.getLogger("main")
 
     kb = KnowledgeBase(dict_path=Path("final_law_dict.txt"))
-    ocr = OCREngine()
+    ocr = OCREngine(enable_preprocess=enable_preprocess)
     llm = LLMClient()
-    pipeline = DocumentPipeline(llm=llm, kb=kb, ocr=ocr)
+    pipeline = DocumentPipeline(llm=llm, kb=kb, ocr=ocr, prompt_dir=prompt_dir)
 
     images = collect_images(None, image_dir)
     if not images:
@@ -133,15 +135,15 @@ def save_per_image_outputs(result_root: Path, image_path: Path, result: Pipeline
     md_path.write_text("\n".join(md_lines), encoding="utf-8")
 
 
-def run_single_list(images: Iterable[Path], output_csv: Path, suggestion_md: Path, result_root: Path) -> None:
+def run_single_list(images: Iterable[Path], output_csv: Path, suggestion_md: Path, result_root: Path, prompt_dir: Path, enable_preprocess: bool) -> None:
     load_dotenv()
     setup_logging()
     logger = logging.getLogger("main")
 
     kb = KnowledgeBase(dict_path=Path("final_law_dict.txt"))
-    ocr = OCREngine()
+    ocr = OCREngine(enable_preprocess=enable_preprocess)
     llm = LLMClient()
-    pipeline = DocumentPipeline(llm=llm, kb=kb, ocr=ocr)
+    pipeline = DocumentPipeline(llm=llm, kb=kb, ocr=ocr, prompt_dir=prompt_dir)
 
     aggregated: List[PipelineResult] = []
     for img_path in images:
@@ -178,6 +180,8 @@ if __name__ == "__main__":
     target_dir = args.directory or Path("img")
     output_csv = Path("result_report.csv")
     suggestion_md = Path("suggestion.md")
+    prompt_dir = Path("prompt") / args.prompt_profile if args.prompt_profile != "default" else Path("prompt")
+    enable_preprocess = not args.no_preprocess
 
     # If a single file is provided, process only that file.
     if args.file:
@@ -185,6 +189,6 @@ if __name__ == "__main__":
         if not images:
             raise SystemExit(f"No valid image found: {args.file}")
         # Run pipeline with temp directory as parent of file for iteration.
-        run_single_list(images, output_csv, suggestion_md, args.result_root)
+        run_single_list(images, output_csv, suggestion_md, args.result_root, prompt_dir, enable_preprocess)
     else:
-        run_pipeline(target_dir, output_csv, suggestion_md, args.result_root)
+        run_pipeline(target_dir, output_csv, suggestion_md, args.result_root, prompt_dir, enable_preprocess)
