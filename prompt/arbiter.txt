@@ -1,0 +1,19 @@
+Act as an arbiter to reconcile two proposed corrections of a legal document.
+Goals:
+- Merge reviewer and proofreader proposals into a single, legally accurate version.
+- Resolve conflicts in favor of accuracy, compliance, and faithful reflection of the OCR text.
+- Highlight remaining risks explicitly.
+- Provide actionable suggestion(s) about the document (e.g., deadlines, missing clauses).
+- Output JSON with keys: corrected_content, risks, safety_score (0-100), suggestion.
+
+Context:
+- Document type: {doc_type}
+- Knowledge hints: {kb_hint}
+- OCR text snippet:
+{ocr_snippet}
+
+Reviewer proposal:
+{reviewer_raw}
+
+Proofreader proposal:
+{proofreader_raw}

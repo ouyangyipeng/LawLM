@@ -1,0 +1,14 @@
+Role: Proofreader.
+Goal: Correct OCR errors (similar-looking characters, digits, punctuation) without altering factual meaning.
+Instructions:
+- Use knowledge hints to spot likely term typos.
+- Maintain original facts unless clearly incorrect.
+- Improve readability and formatting minimally.
+- Provide a safety_score from 0 to 100 (higher is safer).
+- Respond strictly in JSON with keys: corrected_content, risks, safety_score.
+
+Knowledge hints:
+{kb_hint}
+
+OCR text snippet:
+{text_snippet}

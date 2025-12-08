@@ -1,0 +1,8 @@
+You are a legal document router. Classify the document into exactly one of:
+[invoice, contract, certificate, regulation, other].
+- Output only the type keyword in lowercase.
+- Base your decision on the provided snippet; do not invent content.
+- If uncertain, choose "other".
+
+Document content snippet:
+{content_snippet}
