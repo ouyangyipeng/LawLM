@@ -10,6 +10,8 @@ from knowledge_base import KnowledgeBase
 from llm_client import LLMClient
 from ocr_engine import OCREngine
 from pipeline import DocumentPipeline, PipelineResult
+from docx_redline import build_redline_docx
+from rapidfuzz.distance import Levenshtein
 
 
 def setup_logging() -> None:
@@ -63,6 +65,7 @@ def run_pipeline(image_dir: Path, output_csv: Path, suggestion_md: Path, result_
         result = pipeline.process_image(img_path)
         if not result:
             continue
+        result = _enrich_similarity(result)
         aggregated.append(result)
         save_per_image_outputs(result_root, img_path, result)
         append_suggestion(suggestion_md, result)
@@ -115,6 +118,7 @@ def save_per_image_outputs(result_root: Path, image_path: Path, result: Pipeline
         "risks": result.risks,
         "safety_score": result.safety_score,
         "suggestion": result.suggestion,
+        "similarity": result.similarity,
     }
     report_path.write_text(pd.Series(report_payload).to_json(force_ascii=False, indent=2), encoding="utf-8")
 
@@ -124,6 +128,7 @@ def save_per_image_outputs(result_root: Path, image_path: Path, result: Pipeline
         f"# Report for {result.file_name}",
         f"- Type: {result.file_type}",
         f"- Safety score: {result.safety_score}",
+        f"- Similarity (auto eval): {result.similarity:.3f}",
         f"- Risks: {result.risks or 'None'}",
         "",
         "## Corrected Content",
@@ -133,6 +138,17 @@ def save_per_image_outputs(result_root: Path, image_path: Path, result: Pipeline
         result.suggestion or "None",
     ]
     md_path.write_text("\n".join(md_lines), encoding="utf-8")
+
+    # Redline DOCX
+    docx_path = out_dir / "redline.docx"
+    build_redline_docx(
+        output_path=docx_path,
+        ocr_text=result.ocr_text,
+        corrected_text=result.corrected_content,
+        risks=result.risks,
+        safety_score=result.safety_score,
+        similarity=result.similarity,
+    )
 
 
 def run_single_list(images: Iterable[Path], output_csv: Path, suggestion_md: Path, result_root: Path, prompt_dir: Path, enable_preprocess: bool) -> None:
@@ -150,6 +166,7 @@ def run_single_list(images: Iterable[Path], output_csv: Path, suggestion_md: Pat
         result = pipeline.process_image(img_path)
         if not result:
             continue
+        result = _enrich_similarity(result)
         aggregated.append(result)
         save_per_image_outputs(result_root, img_path, result)
         append_suggestion(suggestion_md, result)
@@ -173,6 +190,15 @@ def run_single_list(images: Iterable[Path], output_csv: Path, suggestion_md: Pat
     write_mode = "a" if output_csv.exists() else "w"
     df.to_csv(output_csv, mode=write_mode, index=False, header=not output_csv.exists())
     logger.info("Aggregated CSV saved to %s", output_csv)
+
+
+def _enrich_similarity(result: PipelineResult) -> PipelineResult:
+    # If similarity already computed, return; else compute normalized similarity as auto-eval.
+    if result.similarity:
+        return result
+    sim = Levenshtein.normalized_similarity(result.ocr_text, result.corrected_content) if result.corrected_content else 0.0
+    result.similarity = sim
+    return result
 
 
 if __name__ == "__main__":

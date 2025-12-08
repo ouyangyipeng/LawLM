@@ -21,6 +21,7 @@ class PipelineResult:
     risks: str
     safety_score: float
     suggestion: str
+    similarity: float = 0.0
 
 
 class DocumentPipeline:
@@ -53,6 +54,7 @@ class DocumentPipeline:
             proofreader_out=proofreader_out,
         )
 
+        similarity = self._similarity(ocr_result.raw_text, final.get("corrected_content", ""))
         raw_summary = (ocr_result.raw_text[:500] + "...") if len(ocr_result.raw_text) > 500 else ocr_result.raw_text
 
         return PipelineResult(
@@ -64,6 +66,7 @@ class DocumentPipeline:
             risks=final.get("risks", ""),
             safety_score=float(final.get("safety_score", 0.0)),
             suggestion=final.get("suggestion", ""),
+            similarity=similarity,
         )
 
     def _route_document(self, text: str) -> str:
