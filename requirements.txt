@@ -7,3 +7,5 @@ rapidfuzz>=3.9.4
 numpy>=1.24.0
 Pillow>=10.2.0
 python-docx>=0.8.11
+streamlit>=1.40.0
+pdf2image>=1.17.0
