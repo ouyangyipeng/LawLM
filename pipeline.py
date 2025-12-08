@@ -16,6 +16,7 @@ class PipelineResult:
     file_name: str
     file_type: str
     raw_summary: str
+    ocr_text: str
     corrected_content: str
     risks: str
     safety_score: float
@@ -58,6 +59,7 @@ class DocumentPipeline:
             file_name=image_path.name,
             file_type=doc_type,
             raw_summary=raw_summary,
+            ocr_text=ocr_result.raw_text,
             corrected_content=final.get("corrected_content", ""),
             risks=final.get("risks", ""),
             safety_score=float(final.get("safety_score", 0.0)),
