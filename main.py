@@ -133,23 +133,6 @@ def save_per_image_outputs(result_root: Path, image_path: Path, result: Pipeline
     md_path.write_text("\n".join(md_lines), encoding="utf-8")
 
 
-if __name__ == "__main__":
-    args = parse_args()
-    target_dir = args.directory or Path("img")
-    output_csv = Path("result_report.csv")
-    suggestion_md = Path("suggestion.md")
-
-    # If a single file is provided, process only that file.
-    if args.file:
-        images = collect_images(args.file, None)
-        if not images:
-            raise SystemExit(f"No valid image found: {args.file}")
-        # Run pipeline with temp directory as parent of file for iteration.
-        run_single_list(images, output_csv, suggestion_md, args.result_root)
-    else:
-        run_pipeline(target_dir, output_csv, suggestion_md, args.result_root)
-
-
 def run_single_list(images: Iterable[Path], output_csv: Path, suggestion_md: Path, result_root: Path) -> None:
     load_dotenv()
     setup_logging()
@@ -188,3 +171,20 @@ def run_single_list(images: Iterable[Path], output_csv: Path, suggestion_md: Pat
     write_mode = "a" if output_csv.exists() else "w"
     df.to_csv(output_csv, mode=write_mode, index=False, header=not output_csv.exists())
     logger.info("Aggregated CSV saved to %s", output_csv)
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    target_dir = args.directory or Path("img")
+    output_csv = Path("result_report.csv")
+    suggestion_md = Path("suggestion.md")
+
+    # If a single file is provided, process only that file.
+    if args.file:
+        images = collect_images(args.file, None)
+        if not images:
+            raise SystemExit(f"No valid image found: {args.file}")
+        # Run pipeline with temp directory as parent of file for iteration.
+        run_single_list(images, output_csv, suggestion_md, args.result_root)
+    else:
+        run_pipeline(target_dir, output_csv, suggestion_md, args.result_root)
