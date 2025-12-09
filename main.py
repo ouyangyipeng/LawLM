@@ -1,10 +1,12 @@
 import argparse
 import logging
+import tempfile
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, Tuple
 
 import pandas as pd
 from dotenv import load_dotenv
+from pdf2image import convert_from_path
 
 from knowledge_base import KnowledgeBase
 from llm_client import LLMClient
@@ -21,7 +23,7 @@ def setup_logging() -> None:
     )
 
 
-SUPPORTED_SUFFIXES = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
+SUPPORTED_SUFFIXES = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".pdf"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -45,6 +47,23 @@ def collect_images(single_file: Path | None, directory: Path | None) -> List[Pat
     return [p for p in dir_path.iterdir() if p.suffix.lower() in SUPPORTED_SUFFIXES]
 
 
+def expand_inputs(paths: List[Path]) -> Tuple[List[Path], List[Path]]:
+    """Expand PDFs to per-page images; return (image_paths, cleanup_paths)."""
+    expanded: List[Path] = []
+    cleanup: List[Path] = []
+    for p in paths:
+        if p.suffix.lower() != ".pdf":
+            expanded.append(p)
+            continue
+        pages = convert_from_path(p, dpi=300)
+        for idx, page in enumerate(pages, 1):
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_{p.stem}_p{idx}.png")
+            page.save(tmp.name)
+            expanded.append(Path(tmp.name))
+            cleanup.append(Path(tmp.name))
+    return expanded, cleanup
+
+
 def run_pipeline(image_dir: Path, output_csv: Path, suggestion_md: Path, result_root: Path, prompt_dir: Path, enable_preprocess: bool) -> None:
     load_dotenv()
     setup_logging()
@@ -61,14 +80,23 @@ def run_pipeline(image_dir: Path, output_csv: Path, suggestion_md: Path, result_
         return
 
     aggregated: List[PipelineResult] = []
-    for img_path in images:
-        result = pipeline.process_image(img_path)
-        if not result:
-            continue
-        result = _enrich_similarity(result)
-        aggregated.append(result)
-        save_per_image_outputs(result_root, img_path, result)
-        append_suggestion(suggestion_md, result)
+    inputs, cleanup_paths = expand_inputs(images)
+    if not inputs:
+        logger.warning("No valid images found after PDF expansion.")
+        return
+    try:
+        for img_path in inputs:
+            result = pipeline.process_image(img_path)
+            if not result:
+                continue
+            result = _enrich_similarity(result)
+            aggregated.append(result)
+            save_per_image_outputs(result_root, img_path, result)
+            append_suggestion(suggestion_md, result)
+    finally:
+        for tmp in cleanup_paths:
+            if tmp.exists():
+                tmp.unlink()
 
     if not aggregated:
         logger.warning("No results produced.")
@@ -162,14 +190,24 @@ def run_single_list(images: Iterable[Path], output_csv: Path, suggestion_md: Pat
     pipeline = DocumentPipeline(llm=llm, kb=kb, ocr=ocr, prompt_dir=prompt_dir)
 
     aggregated: List[PipelineResult] = []
-    for img_path in images:
-        result = pipeline.process_image(img_path)
-        if not result:
-            continue
-        result = _enrich_similarity(result)
-        aggregated.append(result)
-        save_per_image_outputs(result_root, img_path, result)
-        append_suggestion(suggestion_md, result)
+    input_list = list(images)
+    inputs, cleanup_paths = expand_inputs(input_list)
+    if not inputs:
+        logger.warning("No valid images found after PDF expansion.")
+        return
+    try:
+        for img_path in inputs:
+            result = pipeline.process_image(img_path)
+            if not result:
+                continue
+            result = _enrich_similarity(result)
+            aggregated.append(result)
+            save_per_image_outputs(result_root, img_path, result)
+            append_suggestion(suggestion_md, result)
+    finally:
+        for tmp in cleanup_paths:
+            if tmp.exists():
+                tmp.unlink()
 
     if not aggregated:
         logger.warning("No results produced.")
